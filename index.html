@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>房貸試算與比較系統</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Inter:wght@300;400;500;600&display=swap"
+        rel="stylesheet">
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            font-size: 0.75em;
+            border-radius: 4px;
+            margin-right: 4px;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .badge-primary {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <h2>房貸試算系統</h2>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-target="calculator-view">
+                    <span>房貸試算與比較</span>
+                </li>
+                <li class="nav-item" data-target="pdf-view">
+                    <span>銀行方案預覽 (PDF)</span>
+                </li>
+            </ul>
+
+            <div class="sidebar-footer">
+                <div class="global-params">
+                    <h3>全域設定</h3>
+                    <div class="input-group">
+                        <label>總房價 (萬)</label>
+                        <input type="number" id="input-total-price" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>貸款成數 (%)</label>
+                        <input type="number" id="input-loan-ratio" step="1" max="100">
+                    </div>
+                    <div class="summary-card">
+                        <label>預計貸款金額</label>
+                        <div class="amount" id="display-loan-amount">0</div>
+                        <div class="unit">萬元</div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+
+            <!-- View: Calculator & Comparison -->
+            <section id="calculator-view" class="view-section active">
+                <header class="section-header">
+                    <h1>房貸方案比較與分析</h1>
+                    <p class="subtitle">即時計算並比較各家銀行的本息攤還細節</p>
+                </header>
+
+                <div class="dashboard-grid">
+                    <!-- Chart Section -->
+
+
+                    <!-- Comparison Table -->
+                    <div class="card table-card">
+                        <div class="card-header">
+                            <h3>銀行方案詳細數據比較</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table id="comparison-table">
+                                <thead>
+                                    <tr>
+                                        <th>銀行名稱</th>
+                                        <th>利率結構</th>
+                                        <th>寬限期</th>
+                                        <th>寬限期內月付</th>
+                                        <th>寬限期後月付</th>
+                                        <th>總利息支出</th>
+                                        <th>總還款金額</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Dynamic Content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- View: PDF Preview -->
+            <section id="pdf-view" class="view-section" style="display: none;">
+                <header class="section-header">
+                    <h1>銀行方案文件預覽</h1>
+                </header>
+                <div class="pdf-layout">
+                    <div class="pdf-sidebar">
+                        <ul id="pdf-list">
+                            <!-- PDF File List -->
+                        </ul>
+                    </div>
+                    <div class="pdf-viewer">
+                        <iframe id="pdf-iframe" src="" frameborder="0"></iframe>
+                        <div id="pdf-placeholder" class="placeholder-message">請選擇左側文件以預覽內容</div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Load Config first, then Main Script -->
+    <script src="loan.config.js?v=2"></script>
+    <script src="script.js?v=2"></script>
+</body>
+
+</html>

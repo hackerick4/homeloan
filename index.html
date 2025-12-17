@@ -35,10 +35,139 @@
             color: #1e40af;
             border: 1px solid #bfdbfe;
         }
+
+        /* Modal Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            animation: modalSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes modalSlide {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .modal-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .calc-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px dashed var(--border-color);
+        }
+
+        .calc-row:last-child {
+            border-bottom: none;
+        }
+
+        .calc-label {
+            color: var(--text-secondary);
+        }
+
+        .calc-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+        }
+
+        .calc-formula {
+            background: rgba(30, 41, 59, 0.5);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            color: #94a3b8;
+        }
+
+        .clickable-number {
+            cursor: pointer;
+            border-bottom: 1px dashed var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .clickable-number:hover {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
     </style>
 </head>
 
 <body>
+    <!-- Modal -->
+    <div class="modal-overlay" id="detail-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">計算詳情</h3>
+                <button class="modal-close"
+                    onclick="document.getElementById('detail-modal').classList.remove('active')">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" id="modal-body-content">
+                <!-- Dynamic Content -->
+            </div>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
@@ -85,8 +214,17 @@
                 </header>
 
                 <div class="dashboard-grid">
-                    <!-- Chart Section -->
-
+                    <!-- Visualization Section -->
+                    <div class="card viz-card">
+                        <div class="card-header">
+                            <h3>最佳貸款組合分析</h3>
+                            <p class="subtitle" style="margin: 0; font-size: 0.9em; opacity: 0.8;">
+                                由於部分銀行有額度上限，系統自動計算並由最佳補位銀行填補缺口</p>
+                        </div>
+                        <div class="chart-container" id="d3-viz-container" style="height: 350px;">
+                            <!-- D3 Viz will be rendered here -->
+                        </div>
+                    </div>
 
                     <!-- Comparison Table -->
                     <div class="card table-card">

@@ -558,22 +558,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const rowId = 'bank-row-' + Date.now();
         const div = document.createElement('div');
         div.className = 'manual-bank-row';
-        div.style.marginBottom = '16px';
-        div.style.padding = '12px';
-        div.style.border = '1px solid var(--border-color)';
-        div.style.borderRadius = '8px';
-        div.style.background = '#f9fafb';
         div.dataset.id = rowId;
 
         // Header with Delete Button
         const header = document.createElement('div');
-        header.style.display = 'flex';
-        header.style.justifyContent = 'space-between';
-        header.style.alignItems = 'center';
-        header.style.marginBottom = '8px';
+        header.className = 'manual-bank-header';
         header.innerHTML = `
             <span style="font-size: 0.85em; color: var(--text-secondary); font-weight: 500;">銀行方案</span>
-            ${dom.manual.bankListContainer.children.length > 0 ? `<button class="btn-remove-row" style="background:none; border:none; color: var(--danger-color); cursor: pointer; font-size: 0.85em;">移除</button>` : ''}
+            ${dom.manual.bankListContainer.children.length > 0 ? `<button class="btn-remove-row">移除</button>` : ''}
         `;
 
         // Remove handler
@@ -587,20 +579,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Inputs Container
         const inputsDiv = document.createElement('div');
+        inputsDiv.className = 'manual-inputs-container';
         inputsDiv.innerHTML = `
-            <div style="margin-bottom: 8px;">
-                <select class="manual-bank-select" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+            <div class="manual-select-group">
+                <select class="manual-bank-select">
                     <!-- Options -->
                 </select>
             </div>
-            <div style="display: flex; gap: 10px;">
-                <div style="flex: 1;">
-                    <label style="display:block; font-size:0.75em; color:#64748b; margin-bottom:2px;">金額 (萬)</label>
-                    <input type="number" class="manual-loan-amount" value="${initialAmount}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+            <div class="manual-inputs-row">
+                <div class="manual-input-group">
+                    <label>金額 (萬)</label>
+                    <input type="number" class="manual-loan-amount" value="${initialAmount}">
                 </div>
-                <div style="flex: 1;">
-                    <label style="display:block; font-size:0.75em; color:#64748b; margin-bottom:2px;">年限 (年)</label>
-                    <input type="number" class="manual-loan-term" value="30" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                <div class="manual-input-group">
+                    <label>年限 (年)</label>
+                    <input type="number" class="manual-loan-term" value="30">
                 </div>
             </div>
         `;

@@ -320,13 +320,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
             tr.innerHTML = `
-                <td>${nameHtml}</td>
-                <td style="font-size: 0.9em; color: var(--text-secondary); line-height: 1.4;">${rateStr}</td>
-                <td>${res.bank.gracePeriod} 年</td>
-                <td>${gracePaymentStr}</td>
-                <td>${postGracePaymentStr}</td>
-                <td class="amount-cell clickable-number" onclick="window.showDetail(${index}, 'total_interest')">$${res.summary.totalInterest.toLocaleString()}</td>
-                <td class="amount-cell clickable-number" onclick="window.showDetail(${index}, 'total_payment')" style="font-weight:700; color: var(--accent-color)">$${res.summary.totalPayment.toLocaleString()}</td>
+                <td data-label="銀行名稱">${nameHtml}</td>
+                <td data-label="利率結構" style="font-size: 0.9em; color: var(--text-secondary); line-height: 1.4;">${rateStr}</td>
+                <td data-label="寬限期">${res.bank.gracePeriod} 年</td>
+                <td data-label="寬限期內月付">${gracePaymentStr}</td>
+                <td data-label="寬限期後月付">${postGracePaymentStr}</td>
+                <td data-label="總利息支出" class="amount-cell clickable-number" onclick="window.showDetail(${index}, 'total_interest')">$${res.summary.totalInterest.toLocaleString()}</td>
+                <td data-label="總還款金額" class="amount-cell clickable-number" onclick="window.showDetail(${index}, 'total_payment')" style="font-weight:700; color: var(--accent-color)">$${res.summary.totalPayment.toLocaleString()}</td>
             `;
             dom.tableBody.appendChild(tr);
         });

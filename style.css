@@ -469,4 +469,80 @@ tbody tr:hover {
     .pdf-viewer {
         height: 500px;
     }
+
+    /* Mobile Table to Cards */
+    table,
+    thead,
+    tbody,
+    th,
+    td,
+    tr {
+        display: block;
+    }
+
+    /* Hide table headers (but not display: none;, for accessibility) */
+    thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+
+    #comparison-table tbody tr {
+        background: rgba(30, 41, 59, 0.5);
+        /* lighter bg for card */
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        margin-bottom: 16px;
+        padding: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    #comparison-table td {
+        border: none;
+        position: relative;
+        padding-left: 0;
+        padding-right: 0;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        text-align: right;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    #comparison-table td:last-child {
+        border-bottom: none;
+    }
+
+    #comparison-table td::before {
+        content: attr(data-label);
+        font-weight: 500;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        margin-right: 16px;
+        text-align: left;
+    }
+
+    /* Special styling for Bank Name (First Cell) */
+    #comparison-table td[data-label="銀行名稱"] {
+        display: block;
+        /* Stack */
+        text-align: left;
+        padding-top: 0;
+        margin-bottom: 8px;
+        border-bottom: 1px solid var(--card-border);
+        padding-bottom: 12px;
+    }
+
+    #comparison-table td[data-label="銀行名稱"]::before {
+        display: none;
+        /* Hide label for bank name */
+    }
+
+    #comparison-table td[data-label="銀行名稱"]>div:first-child {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: var(--accent-color);
+    }
 }

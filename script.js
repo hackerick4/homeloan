@@ -7,6 +7,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const dom = {
         navItems: document.querySelectorAll('.nav-item'),
         viewSections: document.querySelectorAll('.view-section'),
+        manual: {
+            bankListContainer: document.getElementById('manual-bank-list'),
+            btnAddBank: document.getElementById('btn-add-bank'),
+            results: {
+                grace: document.getElementById('val-grace'),
+                gracePayment: document.getElementById('val-grace-payment'),
+                postGracePayment: document.getElementById('val-post-grace-payment'),
+                totalInterest: document.getElementById('val-total-interest'),
+                totalPayment: document.getElementById('val-total-payment')
+            }
+        },
         inputs: {
             totalPrice: document.getElementById('input-total-price'),
             loanRatio: document.getElementById('input-loan-ratio')
@@ -19,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
         pdfList: document.getElementById('pdf-list'),
         pdfIframe: document.getElementById('pdf-iframe'),
         pdfPlaceholder: document.getElementById('pdf-placeholder'),
+        pdfViewer: document.querySelector('.pdf-viewer'),
+        closePdfBtn: document.getElementById('close-pdf-btn'),
         tableHeader: document.querySelector('.table-card .card-header h3')
     };
 
@@ -28,7 +41,9 @@ document.addEventListener('DOMContentLoaded', () => {
         loanRatio: window.LoanConfig.defaultValues.loanRatio * 100, // as percentage 75
         loanAmount: 0, // calculated
         activeBankId: null, // for PDF
-        currentResults: [] // Store results for modal access
+        activeBankId: null, // for PDF
+        currentResults: [], // Store results for comparison table modal access
+        manualResultAgg: null // Store manual calculation results for modal access
     };
 
     // 3. 核心計算邏輯
@@ -100,10 +115,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 4. 更新表格
         state.currentResults = results; // Save for modal
         renderTable(results);
-
-        // 5. 更新視覺化圖表
-        renderViz(results, fallbackBank);
     }
+
+
 
     /**
      * 組合兩個貸款計算結果
@@ -154,17 +168,23 @@ document.addEventListener('DOMContentLoaded', () => {
      * @param bank 銀行物件
      * @param principal 本金
      * @param isCappedCalculation 是否為有上限的計算 (影響顯示邏輯，但在這裡純數學計算沒差)
+     * @param manualTerm Optional: 手動指定年限 (for Manual Tab)
      */
-    function calculateBankDetails(bank, principal, isCappedCalculation) {
+    function calculateBankDetails(bank, principal, isCappedCalculation, manualTerm = null) {
         // Determine Loan Term: Use Bank Specific if longer than default, otherwise default
         let bankTerm = 0;
         if (bank.rates && bank.rates.length > 0) {
             bankTerm = bank.rates.reduce((acc, r) => acc + r.year, 0); // e.g. 40
         }
-        const configTerm = window.LoanConfig.defaultValues.loanTermYears; // 30
-        const finalYearTerm = Math.max(bankTerm, configTerm);
-        // User requested: Fubon is 40 years.
-        // If config rates say 40 years, we should use it.
+
+        // If manualTerm is provided, override logic
+        let finalYearTerm = 0;
+        if (manualTerm) {
+            finalYearTerm = manualTerm;
+        } else {
+            const configTerm = window.LoanConfig.defaultValues.loanTermYears; // 30
+            finalYearTerm = Math.max(bankTerm, configTerm);
+        }
 
         const totalMonths = finalYearTerm * 12;
 
@@ -184,14 +204,26 @@ document.addEventListener('DOMContentLoaded', () => {
         let gracePeriodMonths = bank.gracePeriod * 12;
 
         let currentRateIndex = 0;
+        // Adjust rate end month based on ratio of total term if manual term differs? 
+        // Or just Assume rate structure holds for specified years?
+        // Usually rates are defined like "Year 1-2: x%, Year 3+: y%".
+        // If user sets 40 years, Year 3+ just continues.
+        // So we just use rates as defined.
+
         let currentRateEndMonth = getMacRateEndMonth(bank.rates, 0);
 
         for (let month = 1; month <= totalMonths; month++) {
             // 決定當前利率
+            // If the last rate has a year limit (e.g. year 40), and user sets 50 years, 
+            // valid logic is to extend the last rate.
+            // My getMacRateEndMonth logic sums years from index 0 to index.
+
             if (month > currentRateEndMonth && currentRateIndex < bank.rates.length - 1) {
                 currentRateIndex++;
                 currentRateEndMonth = getMacRateEndMonth(bank.rates, currentRateIndex);
             }
+            // If we run out of defined rates, we stick to the last one (currentRateIndex is at last)
+
             const annualRate = bank.rates[currentRateIndex].rate;
             const monthlyRate = annualRate / 100 / 12;
 
@@ -235,13 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 firstMonthPayment: monthlyData[1] ? monthlyData[1].payment : 0,
                 firstPostGracePayment: monthlyData[gracePeriodMonths + 1] ? monthlyData[gracePeriodMonths + 1].payment : 0,
                 totalInterest: totalInterest,
-                totalPayment: totalPayment + (isCappedCalculation ? bank.fee : 0) // 手續費只算一次(Primary算), Secondary如果也有手續費? 這裡假設補位不收或算在Primary
-                // 修正：如果補位是另一家銀行，應該也要算手續費。但通常補位是"概念上"的。
-                // 為了精確，若是 Combo，Secondary 的 calculateBankDetails 傳入 false (not capped calc) 會加 fee。
-                // 我們在 combineResults 裡直接相加 totalPayment，所以這裡應該都要加 fee。
-                // 等等，如果是同一個銀行拆兩單，fee 可能只收一次。
-                // 如果是不同銀行，fee 收兩次。
-                // 簡單起見：都加。
+                totalPayment: totalPayment + (isCappedCalculation ? bank.fee : 0) // See logic above
             }
         };
     }
@@ -424,148 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
         modal.classList.add('active');
     };
 
-    // 5. D3 視覺化 - 動態過程演示 (Process Animation)
-    function renderViz(results, fallbackBank) {
-        const container = dom.vizContainer;
-        if (!container) return;
-        container.innerHTML = '';
 
-        const margin = { top: 40, right: 100, bottom: 20, left: 160 }; // Increased Text Space
-        const width = container.clientWidth - margin.left - margin.right;
-        const height = Math.max(results.length * 50, 300); // Dynamic height
-        container.style.height = `${height + margin.top + margin.bottom}px`;
-
-        const svg = d3.select(container)
-            .append("svg")
-            .attr("width", width + margin.left + margin.right)
-            .attr("height", height + margin.top + margin.bottom)
-            .append("g")
-            .attr("transform", `translate(${margin.left},${margin.top})`);
-
-        // Scales
-        const y = d3.scaleBand()
-            .domain(results.map(d => d.bank.name))
-            .range([0, height])
-            .padding(0.4);
-
-        const x = d3.scaleLinear()
-            .domain([0, state.loanAmount * 1.05]) // Leave some space
-            .range([0, width]);
-
-        // Draw Y Axis
-        svg.append("g")
-            .call(d3.axisLeft(y).tickSize(0))
-            .select(".domain").remove()
-            .selectAll("text")
-            .style("font-size", "14px")
-            .style("font-weight", "500")
-            .style("fill", "#334155");
-
-        // Draw Background Grid (Target Line)
-        svg.append("line")
-            .attr("x1", x(state.loanAmount))
-            .attr("x2", x(state.loanAmount))
-            .attr("y1", 0)
-            .attr("y2", height)
-            .attr("stroke", "#cbd5e1")
-            .attr("stroke-dasharray", "4")
-            .attr("stroke-width", 1);
-
-        svg.append("text")
-            .attr("x", x(state.loanAmount))
-            .attr("y", -10)
-            .text(`目標: ${(state.loanAmount / 10000).toLocaleString()}萬`)
-            .attr("text-anchor", "middle")
-            .style("font-size", "12px")
-            .style("fill", "#64748b");
-
-        // Rows Container
-        const rows = svg.selectAll(".row")
-            .data(results)
-            .join("g")
-            .attr("class", "row")
-            .attr("transform", d => `translate(0, ${y(d.bank.name)})`);
-
-        // --- ANIMATION SEQUENCE ---
-
-        // 1. Primary Bar (Grows from 0)
-        const primaryBars = rows.append("rect")
-            .attr("x", 0)
-            .attr("y", 0)
-            .attr("height", y.bandwidth())
-            .attr("fill", "#3b82f6") // Blue
-            .attr("width", 0) // Start at 0
-            .attr("rx", 4);
-
-        primaryBars.transition()
-            .duration(1000)
-            .ease(d3.easeCubicOut)
-            .attr("width", d => x(d.isCombo ? d.bank.maxLoanAmount : d.effectivePrincipal));
-
-        // 2. Gap Filling (Only for Combos)
-        const secondaryBars = rows.filter(d => d.isCombo)
-            .append("rect")
-            .attr("x", d => x(d.bank.maxLoanAmount)) // Start at end of primary
-            .attr("y", 0)
-            .attr("height", y.bandwidth())
-            .attr("fill", "#ef4444") // Start Red (Warning/Gap)
-            .attr("width", 0) // Start empty
-            .attr("rx", 4);
-
-        // Sequence: Wait for primary to finish (1000ms), show gap warning, then fill
-        secondaryBars.transition()
-            .delay(1000)
-            .duration(800)
-            .attr("width", d => x(d.gapAmount)) // Expand to show gap
-            .transition()
-            .duration(500)
-            .attr("fill", "#f59e0b"); // Turn Orange (Filled)
-
-        // 3. Text Labels (Fade In)
-
-        // Primary Label
-        rows.append("text")
-            .attr("x", 5)
-            .attr("y", y.bandwidth() / 2)
-            .attr("dy", ".35em")
-            .style("fill", "white")
-            .style("font-size", "11px")
-            .style("opacity", 0)
-            .text(d => (d.effectivePrincipal / 10000).toFixed(0))
-            .transition()
-            .delay(500)
-            .style("opacity", function (d) { return d.isCombo ? 0 : 1; }); // Hide if combo initially, or simple logic
-
-        // Combo Labels
-        const comboLabels = rows.filter(d => d.isCombo)
-            .append("g")
-            .style("opacity", 0);
-
-        comboLabels.transition().delay(2000).style("opacity", 1);
-
-        comboLabels.append("text")
-            .attr("x", d => x(d.bank.maxLoanAmount) + 5)
-            .attr("y", y.bandwidth() / 2)
-            .attr("dy", ".35em")
-            .style("fill", "white")
-            .style("font-size", "10px")
-            .text(d => `+${d.secondaryBank.name.substr(0, 2)}`); // Show "Combined" name logic
-
-        // Total Label at right
-        rows.append("text")
-            .attr("x", x(state.loanAmount) + 10)
-            .attr("y", y.bandwidth() / 2)
-            .attr("dy", ".35em")
-            .style("fill", "#64748b")
-            .style("font-size", "12px")
-            .style("font-weight", "bold")
-            .style("opacity", 0)
-            .text(d => d.isCombo ? "完美組合" : "足額")
-            .transition()
-            .delay(2300)
-            .style("opacity", 1);
-
-    }
 
 
     // 6. 事件監聽
@@ -587,6 +472,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Resize chart if switching to calculator view
                     if (targetId === 'calculator-view') {
                         calculateLoan();
+                    } else if (targetId === 'manual-view') {
+                        initManualView();
                     }
                 }, 10);
             }
@@ -619,10 +506,312 @@ document.addEventListener('DOMContentLoaded', () => {
                 dom.pdfIframe.src = pdfPath;
                 dom.pdfIframe.style.display = 'block';
                 dom.pdfPlaceholder.style.display = 'none';
+
+                // Trigger Fullscreen on Mobile
+                dom.pdfViewer.classList.add('active');
             });
             dom.pdfList.appendChild(li);
         });
+
+        // Handle Close PDF on Mobile
+        if (dom.closePdfBtn) {
+            dom.closePdfBtn.addEventListener('click', () => {
+                dom.pdfViewer.classList.remove('active');
+                // Optional: reset iframe if desired, but keeping it keeps state
+                // dom.pdfIframe.src = ''; 
+            });
+        }
     }
+
+    // ==========================================
+    // Manual View Logic (Multi-Bank Support)
+    // ==========================================
+
+    function initManualView() {
+        // Init with one row if empty
+        if (dom.manual.bankListContainer.children.length === 0) {
+            // Default to Total Loan Amount (converted to Wan)
+            const initialAmount = state.loanAmount / 10000;
+            addBankRow(initialAmount);
+            calculateManualDetails();
+        }
+
+        // Add Button Listener
+        dom.manual.btnAddBank.onclick = () => {
+            // Calculate remaining amount
+            let currentSum = 0;
+            const rows = dom.manual.bankListContainer.querySelectorAll('.manual-bank-row');
+            rows.forEach(row => {
+                const val = parseFloat(row.querySelector('.manual-loan-amount').value) || 0;
+                currentSum += val;
+            });
+
+            const totalLoanWan = state.loanAmount / 10000;
+            const remaining = Math.max(0, totalLoanWan - currentSum);
+
+            addBankRow(remaining);
+            calculateManualDetails();
+        };
+    }
+
+    function addBankRow(initialAmount = 500) {
+        const rowId = 'bank-row-' + Date.now();
+        const div = document.createElement('div');
+        div.className = 'manual-bank-row';
+        div.style.marginBottom = '16px';
+        div.style.padding = '12px';
+        div.style.border = '1px solid var(--border-color)';
+        div.style.borderRadius = '8px';
+        div.style.background = '#f9fafb';
+        div.dataset.id = rowId;
+
+        // Header with Delete Button
+        const header = document.createElement('div');
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.alignItems = 'center';
+        header.style.marginBottom = '8px';
+        header.innerHTML = `
+            <span style="font-size: 0.85em; color: var(--text-secondary); font-weight: 500;">銀行方案</span>
+            ${dom.manual.bankListContainer.children.length > 0 ? `<button class="btn-remove-row" style="background:none; border:none; color: var(--danger-color); cursor: pointer; font-size: 0.85em;">移除</button>` : ''}
+        `;
+
+        // Remove handler
+        const removeBtn = header.querySelector('.btn-remove-row');
+        if (removeBtn) {
+            removeBtn.onclick = () => {
+                div.remove();
+                calculateManualDetails();
+            };
+        }
+
+        // Inputs Container
+        const inputsDiv = document.createElement('div');
+        inputsDiv.innerHTML = `
+            <div style="margin-bottom: 8px;">
+                <select class="manual-bank-select" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                    <!-- Options -->
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div style="flex: 1;">
+                    <label style="display:block; font-size:0.75em; color:#64748b; margin-bottom:2px;">金額 (萬)</label>
+                    <input type="number" class="manual-loan-amount" value="${initialAmount}" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="display:block; font-size:0.75em; color:#64748b; margin-bottom:2px;">年限 (年)</label>
+                    <input type="number" class="manual-loan-term" value="30" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1;">
+                </div>
+            </div>
+        `;
+
+        // Populate Select
+        const select = inputsDiv.querySelector('.manual-bank-select');
+        window.LoanConfig.banks.forEach((bank, index) => {
+            const opt = document.createElement('option');
+            opt.value = index;
+            opt.textContent = bank.name;
+            select.appendChild(opt);
+        });
+
+        // Add Listeners
+        const inputs = inputsDiv.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            input.addEventListener('input', calculateManualDetails);
+            input.addEventListener('change', calculateManualDetails);
+        });
+
+        div.appendChild(header);
+        div.appendChild(inputsDiv);
+        dom.manual.bankListContainer.appendChild(div);
+    }
+
+    function calculateManualDetails() {
+        const rows = dom.manual.bankListContainer.querySelectorAll('.manual-bank-row');
+
+        let agg = {
+            loanAmount: 0,
+            firstMonthPayment: 0,
+            totalInterest: 0,
+            totalPayment: 0,
+            gracePeriods: [],
+            logicPayments: [] // To calc post grace properly
+        };
+
+        let maxGrace = 0;
+
+        // 1. Calculate each row independently
+        rows.forEach(row => {
+            const bankIdx = row.querySelector('.manual-bank-select').value;
+            const amountVal = parseFloat(row.querySelector('.manual-loan-amount').value);
+            const termVal = parseInt(row.querySelector('.manual-loan-term').value);
+
+            if (bankIdx === '' || isNaN(amountVal) || isNaN(termVal)) return;
+
+            const bank = window.LoanConfig.banks[bankIdx];
+            const amount = amountVal * 10000;
+
+            const res = calculateBankDetails(bank, amount, false, termVal);
+
+            agg.loanAmount += amount;
+            agg.firstMonthPayment += res.summary.firstMonthPayment;
+            agg.totalInterest += res.summary.totalInterest;
+            agg.totalPayment += res.summary.totalPayment;
+
+            agg.gracePeriods.push(bank.gracePeriod);
+            if (bank.gracePeriod > maxGrace) maxGrace = bank.gracePeriod;
+
+            // Store result to calculate aggregated post-grace later
+            // We need access to helper `getPaymentAtMonth` or just the array
+            agg.logicPayments.push(res);
+        });
+
+        // 2. Calculate Aggregated Post Grace Payment
+        // Logic: Sum of payments at month = Max(Grace) * 12 + 2
+        // Just like combineResults logic
+        const logicMonth = maxGrace * 12 + 2;
+        let aggPostGrace = 0;
+        agg.logicPayments.forEach(res => {
+            aggPostGrace += getPaymentAtMonth(res, logicMonth);
+        });
+
+        // 3. Render
+        // Grace Period Display: if multiple differ, show Range or Max?
+        // Let's show Max or "混合"
+        const uniqueGrace = [...new Set(agg.gracePeriods)];
+        const graceText = uniqueGrace.length > 1 ? `混合 (最大${maxGrace}年)` : `${maxGrace} 年`;
+
+
+        // Store global state for modal
+        state.manualResultAgg = agg;
+        state.manualResultAgg.maxGrace = maxGrace; // store for reference
+
+        const fmt = n => '$' + n.toLocaleString();
+
+        // Render with Clickable Spans
+        dom.manual.results.grace.textContent = graceText;
+
+        dom.manual.results.gracePayment.innerHTML = `<span class="clickable-number" onclick="window.showManualDetail('grace_payment')">${fmt(agg.firstMonthPayment)}</span>`;
+        dom.manual.results.postGracePayment.innerHTML = `<span class="clickable-number" onclick="window.showManualDetail('post_grace_payment')">${fmt(aggPostGrace)}</span>`;
+        dom.manual.results.totalInterest.innerHTML = `<span class="clickable-number" onclick="window.showManualDetail('total_interest')">${fmt(agg.totalInterest)}</span>`;
+        dom.manual.results.totalPayment.innerHTML = `<span class="clickable-number" onclick="window.showManualDetail('total_payment')">${fmt(agg.totalPayment)}</span>`;
+    }
+
+    // Manual Detail Modal Handler
+    window.showManualDetail = function (type) {
+        const agg = state.manualResultAgg;
+        if (!agg) return;
+
+        const modal = document.getElementById('detail-modal');
+        const body = document.getElementById('modal-body-content');
+        if (!modal || !body) return;
+
+        let content = '';
+        let title = '';
+        const fmt = n => '$' + n.toLocaleString();
+        const fmtW = n => (n / 10000).toLocaleString() + '萬';
+
+        if (type === 'grace_payment') {
+            title = '寬限期內月付金計算 (多方案加總)';
+            let rowsHtml = '';
+            agg.logicPayments.forEach(res => {
+                const bankName = res.bank.name.split('｜')[0];
+                const amount = res.effectivePrincipal;
+                const rate = res.bank.rates[0].rate;
+                const pmt = res.summary.firstMonthPayment;
+                rowsHtml += `
+                    <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0;">
+                        <div style="font-weight:500; font-size:0.9em; color:var(--text-primary);">${bankName}</div>
+                        <div style="font-size:0.85em; color:var(--text-secondary);">
+                           貸款 ${fmtW(amount)} × 年利 ${rate}% ÷ 12 = <strong>${fmt(pmt)}</strong>
+                        </div>
+                    </div>
+                 `;
+            });
+            content = `
+                <div class="calc-row"><span class="calc-label">總貸款金額</span><span class="calc-value">${fmtW(agg.loanAmount)}</span></div>
+                <div class="calc-formula" style="margin-top:10px;">
+                    ${rowsHtml}
+                    <div style="text-align:right; font-weight:bold; color: var(--accent-color); margin-top:5px;">合計: ${fmt(agg.firstMonthPayment)}</div>
+                </div>
+            `;
+        } else if (type === 'post_grace_payment') {
+            title = '寬限期後月付金 (最大寬限期後)';
+            let rowsHtml = '';
+            // Logic month is derived from maxGrace
+            const logicMonth = agg.maxGrace * 12 + 2;
+
+            agg.logicPayments.forEach(res => {
+                const bankName = res.bank.name.split('｜')[0];
+                const pmt = getPaymentAtMonth(res, logicMonth);
+                rowsHtml += `
+                    <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0;">
+                        <div style="font-weight:500; font-size:0.9em; color:var(--text-primary);">${bankName}</div>
+                        <div style="font-size:0.85em; color:var(--text-secondary);">
+                           第 ${Math.ceil(logicMonth / 12)} 年月付 (本息攤還) = <strong>${fmt(pmt)}</strong>
+                        </div>
+                    </div>
+                 `;
+            });
+            content = `
+                <div class="calc-row"><span class="calc-label">比較基準</span><span class="calc-value">第 ${Math.ceil(logicMonth / 12)} 年 (寬限期全部結束後)</span></div>
+                <div class="calc-formula" style="margin-top:10px;">
+                    ${rowsHtml}
+                    <div style="text-align:right; font-weight:bold; color: var(--accent-color); margin-top:5px;">合計: ${fmt(parseInt(dom.manual.results.postGracePayment.textContent.replace(/\D/g, '')))}</div>
+                </div>
+            `;
+        } else if (type === 'total_interest' || type === 'total_payment') {
+            title = type === 'total_interest' ? '總利息支出' : '總還款金額';
+            let rowsHtml = '';
+            agg.logicPayments.forEach(res => {
+                const bankName = res.bank.name.split('｜')[0];
+                const principal = res.effectivePrincipal;
+                const interest = res.summary.totalInterest;
+                const fee = res.bank.fee || 0;
+                const total = res.summary.totalPayment;
+
+                let details = '';
+                if (type === 'total_interest') {
+                    // Interest Formula
+                    details = `
+                        <div style="font-size:0.85em; color:var(--text-secondary);">
+                            累積總還款 ${fmt(total)} - 本金 ${fmtW(principal)} - 手續費 ${fmt(fee)} = <strong>${fmt(interest)}</strong>
+                        </div>
+                     `;
+                } else {
+                    // Total Payment Formula
+                    details = `
+                        <div style="font-size:0.85em; color:var(--text-secondary);">
+                            本金 ${fmtW(principal)} + 總利息 ${fmt(interest)} + 手續費 ${fmt(fee)} = <strong>${fmt(total)}</strong>
+                        </div>
+                     `;
+                }
+
+                rowsHtml += `
+                    <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed #e2e8f0;">
+                        <div style="font-weight:500; font-size:0.9em; color:var(--text-primary); margin-bottom:2px;">${bankName}</div>
+                        ${details}
+                    </div>
+                 `;
+            });
+            content = `
+                <div class="calc-formula">
+                    <div style="margin-bottom:8px; font-weight:500; color:var(--text-primary);">各方案計算細節：</div>
+                    ${rowsHtml}
+                    <div style="text-align:right; font-weight:bold; color: var(--accent-color); margin-top:8px; font-size: 1.1em;">
+                        總計: ${fmt(type === 'total_interest' ? agg.totalInterest : agg.totalPayment)}
+                    </div>
+                </div>
+            `;
+        }
+
+        document.querySelector('.modal-title').textContent = title;
+        body.innerHTML = content;
+        modal.classList.add('active');
+    };
+
+    // Manual Inputs Event Listeners removed as they are dynamic now
+
 
     // 7. 啟動
     function init() {

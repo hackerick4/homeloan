@@ -64,6 +64,19 @@ const LoanConfig = {
             description: '青年安心成家｜混合式固定＋機動（補貼後）'
         },
 
+        // ===== 合庫：一般房貸 =====
+        {
+            id: 'bank_cooperative_general',
+            name: '合庫銀行｜一般房貸',
+            filename: '合庫貸款公股只作首購.pdf', // Using same PDF for now as user didn't specify
+            rates: [
+                { year: 30, rate: 2.65 }
+            ],
+            gracePeriod: 3, // Assuming 3 years as standard, user didn't specify
+            fee: 5000, // Assuming standard fee
+            description: '一般房貸方案'
+        },
+
         // ===== 中國信託 =====
         {
             id: 'bank_china',

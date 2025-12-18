@@ -1,20 +1,23 @@
 :root {
-    --bg-color: #0f172a;
-    /* Slate 900 */
-    --sidebar-bg: #1e293b;
-    /* Slate 800 */
-    --card-bg: rgba(30, 41, 59, 0.7);
-    --card-border: rgba(148, 163, 184, 0.1);
-    --text-primary: #f8fafc;
+    --bg-color: #f8fafc;
     /* Slate 50 */
-    --text-secondary: #94a3b8;
-    /* Slate 400 */
-    --accent-color: #38bdf8;
-    /* Sky 400 */
-    --accent-hover: #0ea5e9;
+    --sidebar-bg: #ffffff;
+    /* White */
+    --card-bg: #ffffff;
+    --card-border: #e2e8f0;
+    /* Slate 200 */
+    --text-primary: #0f172a;
+    /* Slate 900 */
+    --text-secondary: #64748b;
+    /* Slate 500 */
+    --accent-color: #0ea5e9;
     /* Sky 500 */
-    --success-color: #4ade80;
-    --danger-color: #f87171;
+    --accent-hover: #0284c7;
+    /* Sky 600 */
+    --success-color: #22c55e;
+    /* Green 500 */
+    --danger-color: #ef4444;
+    /* Red 500 */
     --border-radius: 12px;
     --transition-speed: 0.3s;
     --font-main: 'Inter', 'Noto Sans TC', sans-serif;
@@ -57,6 +60,24 @@ body {
     color: var(--text-primary);
     margin-bottom: 32px;
     letter-spacing: 0.5px;
+    display: flex;
+    /* Updated for image alignment */
+    align-items: center;
+    /* Center vertically */
+    gap: 12px;
+    /* Space between text and sticker */
+}
+
+/* Sticker Animation */
+.header-sticker {
+    width: 60px;
+    /* Adjust size as needed */
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+    /* Optional rounded corners */
+    margin-left: auto;
+    /* Push to right if desired, or keep next to text */
 }
 
 .nav-menu {
@@ -76,14 +97,14 @@ body {
 }
 
 .nav-item:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(0, 0, 0, 0.05);
     color: var(--text-primary);
 }
 
 .nav-item.active {
-    background-color: rgba(56, 189, 248, 0.1);
+    background-color: rgba(14, 165, 233, 0.1);
     color: var(--accent-color);
-    border-color: rgba(56, 189, 248, 0.2);
+    border-color: rgba(14, 165, 233, 0.2);
 }
 
 /* Sidebar Footer (Inputs) */
@@ -114,8 +135,8 @@ body {
 
 .input-group input {
     width: 100%;
-    background-color: rgba(0, 0, 0, 0.2);
-    border: 1px solid var(--card-border);
+    background-color: #f1f5f9;
+    border: 1px solid #cbd5e1;
     border-radius: 6px;
     padding: 8px 12px;
     color: var(--text-primary);
@@ -130,11 +151,11 @@ body {
 }
 
 .summary-card {
-    background-color: rgba(56, 189, 248, 0.1);
+    background-color: rgba(14, 165, 233, 0.1);
     padding: 16px;
     border-radius: var(--border-radius);
     margin-top: 16px;
-    border: 1px solid rgba(56, 189, 248, 0.2);
+    border: 1px solid rgba(14, 165, 233, 0.2);
 }
 
 .summary-card label {
@@ -161,7 +182,7 @@ body {
     flex: 1;
     overflow-y: auto;
     padding: 32px 48px;
-    background: radial-gradient(circle at top right, #1e293b 0%, #0f172a 40%);
+    background-color: var(--bg-color);
 }
 
 .section-header {
@@ -262,7 +283,7 @@ td {
 }
 
 tbody tr:hover {
-    background-color: rgba(255, 255, 255, 0.02);
+    background-color: rgba(0, 0, 0, 0.02);
 }
 
 .amount-cell {
@@ -306,7 +327,7 @@ tbody tr:hover {
 }
 
 #pdf-list li:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(0, 0, 0, 0.05);
     color: var(--text-primary);
 }
 
@@ -488,7 +509,7 @@ tbody tr:hover {
     }
 
     #comparison-table tbody tr {
-        background: rgba(30, 41, 59, 0.5);
+        background: #ffffff;
         /* lighter bg for card */
         border: 1px solid var(--card-border);
         border-radius: 12px;
@@ -508,7 +529,7 @@ tbody tr:hover {
         justify-content: space-between;
         align-items: center;
         text-align: right;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid var(--card-border);
     }
 
     #comparison-table td:last-child {
@@ -545,4 +566,85 @@ tbody tr:hover {
         font-weight: 700;
         color: var(--accent-color);
     }
+
+    /* Fullscreen PDF Viewer */
+    .pdf-viewer.active {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 9999;
+        margin: 0;
+        border-radius: 0;
+        border: none;
+        background-color: #525659;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .pdf-viewer.active #pdf-iframe {
+        height: 100%;
+        width: 100%;
+        display: block;
+    }
+
+    .pdf-close-btn {
+        display: flex !important;
+        /* Force show on mobile active */
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        z-index: 10000;
+        background-color: rgba(15, 23, 42, 0.9);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 8px 16px;
+        border-radius: 24px;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    }
+}
+
+/* Modal Specifics - High Contrast */
+.calc-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.calc-label {
+    color: var(--text-secondary);
+}
+
+.calc-value {
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.calc-formula {
+    background-color: #f8fafc;
+    /* Very light slate */
+    padding: 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+    font-size: 0.9em;
+    color: #0f172a;
+    /* Slate 900 - High Contrast */
+    border: 1px solid #cbd5e1;
+    line-height: 1.6;
+}
+
+.calc-formula strong {
+    color: var(--accent-color);
+}
+
+[data-theme="dark"] .calc-formula {
+    background-color: #1e293b;
+    color: #f1f5f9;
+    border-color: #334155;
 }

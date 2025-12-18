@@ -178,11 +178,17 @@
         <!-- Sidebar Navigation -->
         <nav class="sidebar">
             <div class="logo">
-                <h2>房貸試算系統</h2>
+                <h2>
+                    房貸試算系統
+                    <img src="quakka_sticker.png" alt="Quakka Sticker" class="header-sticker">
+                </h2>
             </div>
             <ul class="nav-menu">
                 <li class="nav-item active" data-target="calculator-view">
                     <span>房貸試算與比較</span>
+                </li>
+                <li class="nav-item" data-target="manual-view">
+                    <span>手動試算</span>
                 </li>
                 <li class="nav-item" data-target="pdf-view">
                     <span>銀行方案預覽 (PDF)</span>
@@ -220,18 +226,6 @@
                 </header>
 
                 <div class="dashboard-grid">
-                    <!-- Visualization Section -->
-                    <div class="card viz-card">
-                        <div class="card-header">
-                            <h3>最佳貸款組合分析</h3>
-                            <p class="subtitle" style="margin: 0; font-size: 0.9em; opacity: 0.8;">
-                                由於部分銀行有額度上限，系統自動計算並由最佳補位銀行填補缺口</p>
-                        </div>
-                        <div class="chart-container" id="d3-viz-container" style="height: 350px;">
-                            <!-- D3 Viz will be rendered here -->
-                        </div>
-                    </div>
-
                     <!-- Comparison Table -->
                     <div class="card table-card">
                         <div class="card-header">
@@ -259,6 +253,73 @@
                 </div>
             </section>
 
+            <section id="manual-view" class="view-section" style="display: none;">
+                <header class="section-header">
+                    <h1>手動試算</h1>
+                    <p class="subtitle">自訂銀行與條件，快速試算還款細節</p>
+                </header>
+
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>試算條件設定</h3>
+                        </div>
+                        <div class="card-body" style="padding: 20px;">
+                            <div id="manual-bank-list">
+                                <!-- Bank Rows will be inserted here -->
+                            </div>
+                            <button id="btn-add-bank"
+                                style="margin-top: 10px; width: 100%; padding: 10px; background-color: var(--card-bg); border: 1px dashed var(--accent-color); color: var(--accent-color); border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 500;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" style="margin-right: 6px;">
+                                    <path d="M12 5v14M5 12h14" />
+                                </svg>
+                                新增銀行方案
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card table-card">
+                        <div class="card-header">
+                            <h3>試算結果</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="result-table" style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid var(--border-color); text-align: left;">
+                                        <th style="padding: 12px; color: var(--text-secondary);">項目</th>
+                                        <th style="padding: 12px; color: var(--text-secondary);">數值</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="manual-result-body">
+                                    <tr>
+                                        <td style="padding: 12px;">寬限期</td>
+                                        <td style="padding: 12px;" id="val-grace">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px;">寬限期內月付</td>
+                                        <td style="padding: 12px;" id="val-grace-payment">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px;">寬限期後月付</td>
+                                        <td style="padding: 12px;" id="val-post-grace-payment">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px;">總利息支出</td>
+                                        <td style="padding: 12px;" id="val-total-interest">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 12px;">總還款金額</td>
+                                        <td style="padding: 12px; color: var(--accent-color); font-weight: bold;"
+                                            id="val-total-payment">-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- View: PDF Preview -->
             <section id="pdf-view" class="view-section" style="display: none;">
                 <header class="section-header">
@@ -272,6 +333,13 @@
                     </div>
                     <div class="pdf-viewer">
                         <iframe id="pdf-iframe" src="" frameborder="0"></iframe>
+                        <button id="close-pdf-btn" class="pdf-close-btn" style="display: none;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M18 6L6 18M6 6l12 12" />
+                            </svg>
+                            <span>關閉預覽</span>
+                        </button>
                         <div id="pdf-placeholder" class="placeholder-message">請選擇左側文件以預覽內容</div>
                     </div>
                 </div>

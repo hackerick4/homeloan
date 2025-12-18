@@ -383,6 +383,13 @@ tbody tr:hover {
 
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
+
+    /* Allow body scroll on mobile */
+    body {
+        height: auto;
+        overflow-y: auto;
+    }
+
     .app-container {
         flex-direction: column;
         height: auto;

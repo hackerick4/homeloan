@@ -634,15 +634,12 @@ tbody tr:hover {
 }
 
 .calc-formula {
-    background-color: #f8fafc;
-    /* Very light slate */
-    padding: 16px;
-    border-radius: 8px;
+    background-color: transparent;
+    padding: 0;
     margin-top: 12px;
     font-size: 0.9em;
-    color: #0f172a;
-    /* Slate 900 - High Contrast */
-    border: 1px solid #cbd5e1;
+    color: var(--text-primary);
+    border: none;
     line-height: 1.6;
 }
 
@@ -651,9 +648,9 @@ tbody tr:hover {
 }
 
 [data-theme="dark"] .calc-formula {
-    background-color: #1e293b;
+    background-color: transparent;
     color: #f1f5f9;
-    border-color: #334155;
+    border: none;
 }
 
 /* -----------------------------

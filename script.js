@@ -20,7 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         inputs: {
             totalPrice: document.getElementById('input-total-price'),
-            loanRatio: document.getElementById('input-loan-ratio')
+            loanRatio: document.getElementById('input-loan-ratio'),
+            noGrace: document.getElementById('input-no-grace')
         },
         display: {
             loanAmount: document.getElementById('display-loan-amount'),
@@ -42,8 +43,10 @@ document.addEventListener('DOMContentLoaded', () => {
         loanAmount: 0, // calculated
         activeBankId: null, // for PDF
         activeBankId: null, // for PDF
+        activeBankId: null, // for PDF
         currentResults: [], // Store results for comparison table modal access
-        manualResultAgg: null // Store manual calculation results for modal access
+        manualResultAgg: null, // Store manual calculation results for modal access
+        noGracePeriod: false // Logic toggle
     };
 
     // 3. 核心計算邏輯
@@ -202,6 +205,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let totalInterest = 0;
         let totalPayment = 0;
         let gracePeriodMonths = bank.gracePeriod * 12;
+        if (state.noGracePeriod) {
+            gracePeriodMonths = 0;
+        }
 
         let currentRateIndex = 0;
         // Adjust rate end month based on ratio of total term if manual term differs? 
@@ -348,7 +354,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.innerHTML = `
                 <td data-label="銀行名稱">${nameHtml}</td>
                 <td data-label="利率結構" style="font-size: 0.9em; color: var(--text-secondary); line-height: 1.4;">${rateStr}</td>
-                <td data-label="寬限期">${res.bank.gracePeriod} 年</td>
+                <td data-label="寬限期">${state.noGracePeriod ? '0' : res.bank.gracePeriod} 年 ${state.noGracePeriod ? '<span style="font-size:0.8em;color:var(--text-secondary)">(已停用)</span>' : ''}</td>
                 <td data-label="寬限期內月付">${gracePaymentStr}</td>
                 <td data-label="寬限期後月付">${postGracePaymentStr}</td>
                 <td data-label="總利息支出" class="amount-cell clickable-number" onclick="window.showDetail(${index}, 'total_interest')">$${res.summary.totalInterest.toLocaleString()}</td>
@@ -490,6 +496,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     dom.inputs.totalPrice.addEventListener('input', updateHandler);
     dom.inputs.loanRatio.addEventListener('input', updateHandler);
+    dom.inputs.noGrace.addEventListener('change', () => {
+        state.noGracePeriod = dom.inputs.noGrace.checked;
+        calculateLoan();
+        // Also update manual view if active? Or just call it anyway
+        calculateManualDetails();
+    });
 
 
     // Init PDF List
@@ -644,6 +656,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const bank = window.LoanConfig.banks[bankIdx];
             const amount = amountVal * 10000;
 
+            // Pass special flag or handle via global state logic inside calculateBankDetails? 
+            // Currently calculateBankDetails accesses global state? No, it takes params.
+            // Wait, calculateBankDetails DOES NOT access state.noGracePeriod inside itself in my previous chunk?
+            // Ah, I added `if (state.noGracePeriod)` inside calculateBankDetails in chunk 3.
+            // So default behavior works.
             const res = calculateBankDetails(bank, amount, false, termVal);
 
             agg.loanAmount += amount;
@@ -651,8 +668,9 @@ document.addEventListener('DOMContentLoaded', () => {
             agg.totalInterest += res.summary.totalInterest;
             agg.totalPayment += res.summary.totalPayment;
 
-            agg.gracePeriods.push(bank.gracePeriod);
-            if (bank.gracePeriod > maxGrace) maxGrace = bank.gracePeriod;
+            const effectiveGrace = state.noGracePeriod ? 0 : bank.gracePeriod;
+            agg.gracePeriods.push(effectiveGrace);
+            if (effectiveGrace > maxGrace) maxGrace = effectiveGrace;
 
             // Store result to calculate aggregated post-grace later
             // We need access to helper `getPaymentAtMonth` or just the array

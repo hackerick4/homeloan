@@ -19,49 +19,32 @@ const LoanConfig = {
     // ======================
     banks: [
 
-        // ===== 合庫：一段式 =====
+        // ===== 合庫：一段式(沒優惠利率補貼) =====
         {
             id: 'bank_cooperative_1stage',
-            name: '合庫銀行（公股首購）｜一段式',
+            name: '合庫銀行（公股首購）｜（未補貼）',
             filename: '合庫貸款公股只作首購.pdf',
             rates: [
-                { year: 40, rate: 1.775 } // 補貼後一段式機動利率
+                { year: 40, rate: 2.275 } // 補貼後一段式機動利率
+            ],
+            gracePeriod: 5,
+            fee: 5000,
+            maxLoanAmount: 10000000,
+            description: '青年安心成家｜一段式機動利率（未補貼）'
+        },
+        // ===== 合庫：一段式(優惠利率補貼) =====
+        {
+            id: 'bank_cooperative_1stage',
+            name: '合庫銀行（公股首購）｜（補貼後）',
+            filename: '合庫貸款公股只作首購.pdf',
+            rates: [
+                { year: 3, rate: 1.775 }, // 補貼後一段式機動利率
+                { year: 37, rate: 2.275 } // 補貼後一段式機動利率
             ],
             gracePeriod: 5,
             fee: 5000,
             maxLoanAmount: 10000000,
             description: '青年安心成家｜一段式機動利率（補貼後）'
-        },
-
-        // ===== 合庫：二段式 =====
-        {
-            id: 'bank_cooperative_2stage',
-            name: '合庫銀行（公股首購）｜二段式',
-            filename: '合庫貸款公股只作首購.pdf',
-            rates: [
-                { year: 2, rate: 1.565 }, // 前 2 年
-                { year: 38, rate: 1.865 }  // 第 3 年起
-            ],
-            gracePeriod: 5,
-            fee: 5000,
-            maxLoanAmount: 10000000,
-            description: '青年安心成家｜二段式機動利率（補貼後）'
-        },
-
-        // ===== 合庫：混合式 =====
-        {
-            id: 'bank_cooperative_mixed',
-            name: '合庫銀行（公股首購）｜混合式',
-            filename: '合庫貸款公股只作首購.pdf',
-            rates: [
-                { year: 1, rate: 1.745 }, // 第 1 年固定
-                { year: 1, rate: 1.845 }, // 第 2 年固定
-                { year: 38, rate: 1.865 }  // 第 3 年起機動
-            ],
-            gracePeriod: 5,
-            fee: 5000,
-            maxLoanAmount: 10000000,
-            description: '青年安心成家｜混合式固定＋機動（補貼後）'
         },
 
         // ===== 合庫：一般房貸 =====
@@ -121,7 +104,7 @@ const LoanConfig = {
         // ===== 富邦 =====
         {
             id: 'bank_fubon',
-            name: '富邦銀行｜首購',
+            name: '富邦人壽｜首購',
             filename: '宇雄首綻富邦.pdf',
             rates: [
                 { year: 40, rate: 2.50 } // I + 0.75% 起

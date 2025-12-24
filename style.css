@@ -737,4 +737,40 @@ tbody tr:hover {
         padding: 16px !important;
         font-size: 1rem !important;
     }
+
+    /* Mobile Sort Controls */
+    .mobile-sort-controls {
+        display: flex !important;
+        gap: 8px;
+        width: 100%;
+        margin-top: 12px;
+    }
+
+    #mobile-sort-select {
+        flex: 1;
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        background-color: #f8fafc;
+        color: var(--text-primary);
+    }
+
+    #mobile-sort-dir-btn {
+        padding: 8px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background-color: #f1f5f9;
+        color: var(--text-secondary);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+    }
+}
+
+/* Default hidden on desktop */
+.mobile-sort-controls {
+    display: none;
 }

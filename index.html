@@ -133,13 +133,13 @@
         }
 
         .calc-formula {
-            background: rgba(30, 41, 59, 0.5);
-            padding: 12px;
-            border-radius: 8px;
+            background: transparent;
+            padding: 12px 0;
             margin-top: 8px;
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.9em;
-            color: #94a3b8;
+            color: var(--text-primary);
+            line-height: 1.6;
         }
 
         .clickable-number {
@@ -151,6 +151,22 @@
         .clickable-number:hover {
             color: var(--accent-color);
             border-bottom-color: var(--accent-color);
+        }
+
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s;
+        }
+
+        th.sortable:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .sort-icon {
+            font-size: 0.8em;
+            margin-left: 4px;
+            color: var(--text-secondary);
         }
     </style>
 </head>
@@ -232,8 +248,21 @@
                 <div class="dashboard-grid">
                     <!-- Comparison Table -->
                     <div class="card table-card">
-                        <div class="card-header">
+                        <div class="card-header" style="flex-wrap: wrap; gap: 10px;">
                             <h3>銀行方案詳細數據比較</h3>
+
+                            <!-- Mobile Sort Controls -->
+                            <div class="mobile-sort-controls">
+                                <select id="mobile-sort-select">
+                                    <option value="totalPayment">總還款金額</option>
+                                    <option value="totalInterest">總利息支出</option>
+                                    <option value="gracePayment">寬限期內月付</option>
+                                    <option value="postGracePayment">寬限期後月付</option>
+                                </select>
+                                <button id="mobile-sort-dir-btn">
+                                    <span class="sort-icon-mobile">▲</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="table-responsive">
                             <table id="comparison-table">
@@ -242,10 +271,14 @@
                                         <th>銀行名稱</th>
                                         <th>利率結構</th>
                                         <th>寬限期</th>
-                                        <th>寬限期內月付</th>
-                                        <th>寬限期後月付</th>
-                                        <th>總利息支出</th>
-                                        <th>總還款金額</th>
+                                        <th class="sortable" data-sort="gracePayment">寬限期內月付 <span
+                                                class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="postGracePayment">寬限期後月付 <span
+                                                class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="totalInterest">總利息支出 <span
+                                                class="sort-icon"></span></th>
+                                        <th class="sortable" data-sort="totalPayment">總還款金額 <span
+                                                class="sort-icon"></span></th>
                                     </tr>
                                 </thead>
                                 <tbody>

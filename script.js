@@ -42,12 +42,17 @@ document.addEventListener('DOMContentLoaded', () => {
         loanRatio: window.LoanConfig.defaultValues.loanRatio * 100, // as percentage 75
         loanAmount: 0, // calculated
         activeBankId: null, // for PDF
-        activeBankId: null, // for PDF
-        activeBankId: null, // for PDF
         currentResults: [], // Store results for comparison table modal access
         manualResultAgg: null, // Store manual calculation results for modal access
-        noGracePeriod: false // Logic toggle
+        noGracePeriod: true, // Default: No Grace Period
+        sortColumn: 'totalPayment', // Default sort
+        sortDirection: 'asc' // asc or desc
     };
+
+    // Initialize Checkbox State
+    if (dom.inputs.noGrace) {
+        dom.inputs.noGrace.checked = state.noGracePeriod;
+    }
 
     // 3. 核心計算邏輯
     function calculateLoan() {
@@ -68,26 +73,11 @@ document.addEventListener('DOMContentLoaded', () => {
         dom.tableHeader.textContent = `銀行方案詳細數據比較 (共 ${window.LoanConfig.banks.length} 筆)`;
 
 
-        // 3a. 尋找最佳「補位」銀行 (Uncapped & Lowest Monthly Payment)
-        // 用於當某銀行額度不足時，剩下的金額由這家銀行補足
-        // 用戶傾向於更長的年限 (e.g. 40年) 以降低月付金，因此這裡選 "最低寬限期後月付" (長期負擔最低)
-        const uncappedBanks = window.LoanConfig.banks.filter(b => !b.maxLoanAmount || b.maxLoanAmount >= state.loanAmount);
-        let fallbackBank = null;
-        if (uncappedBanks.length > 0) {
-            let bestScore = Infinity;
-            uncappedBanks.forEach(b => {
-                const sim = calculateBankDetails(b, state.loanAmount, false); // Simulate full amount
-                // Optimize for Lowest Post-Grace Payment (Long-term Affordability)
-                if (sim.summary.firstPostGracePayment < bestScore) {
-                    bestScore = sim.summary.firstPostGracePayment;
-                    fallbackBank = b;
-                }
-            });
-        }
-
+        // 3a. REMOVED GLOBAL FALLBACK SEARCH to prevent mixed banks
+        // We now enforce that fallback must be from the SAME bank group.
 
         // 計算每家銀行的數據 (含聯貸/組合邏輯)
-        const results = window.LoanConfig.banks.map(bank => {
+        let results = window.LoanConfig.banks.map(bank => {
             // Check if capped
             if (bank.maxLoanAmount && state.loanAmount > bank.maxLoanAmount) {
                 // 需要組合貸款
@@ -97,17 +87,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 1. Primary Loan
                 const primaryResult = calculateBankDetails(bank, primaryAmount, true); // is primary of combo
 
-                // 2. Secondary Loan (Gap)
-                let secondaryResult = null;
-                if (fallbackBank) {
-                    // Use the fallback bank for the gap
-                    secondaryResult = calculateBankDetails(fallbackBank, gapAmount, false);
-                } else {
-                    secondaryResult = calculateBankDetails(bank, gapAmount, false);
-                }
+                // 2. Find Sibling Bank (Same Group) for Gap
+                // Strategy: Match ID prefix (e.g. 'bank_cooperative_1stage' -> 'bank_cooperative')
+                // and find a general plan (uncapped or large enough) from same group.
+                const bankPrefix = bank.id.split('_').slice(0, 2).join('_'); // e.g. 'bank_cooperative'
 
-                // 3. Combine Results
-                return combineResults(primaryResult, secondaryResult, gapAmount, fallbackBank);
+                const siblingBank = window.LoanConfig.banks.find(b =>
+                    b.id !== bank.id &&
+                    b.id.startsWith(bankPrefix) &&
+                    (!b.maxLoanAmount || b.maxLoanAmount >= gapAmount)
+                );
+
+                let secondaryResult = null;
+
+                if (siblingBank) {
+                    secondaryResult = calculateBankDetails(siblingBank, gapAmount, false);
+                    // 3. Combine Results
+                    return combineResults(primaryResult, secondaryResult, gapAmount, siblingBank);
+                } else {
+                    // No valid sibling found. Return error result.
+                    const errorResult = calculateBankDetails(bank, state.loanAmount, true); // Calculate full amount
+                    errorResult.isCapped = true; // Force capped flag
+                    errorResult.comboError = true; // New flag for render
+                    return errorResult;
+                }
 
             } else {
                 // 足額，直接計算
@@ -115,9 +118,32 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
+        // SORTING LOGIC
+        if (state.sortColumn) {
+            results.sort((a, b) => {
+                let valA, valB;
+
+                // Map column name to value
+                switch (state.sortColumn) {
+                    case 'gracePayment': valA = a.summary.firstMonthPayment; valB = b.summary.firstMonthPayment; break;
+                    case 'postGracePayment': valA = a.summary.firstPostGracePayment; valB = b.summary.firstPostGracePayment; break;
+                    case 'totalInterest': valA = a.summary.totalInterest; valB = b.summary.totalInterest; break;
+                    case 'totalPayment': valA = a.summary.totalPayment; valB = b.summary.totalPayment; break;
+                    default: valA = 0; valB = 0;
+                }
+
+                if (state.sortDirection === 'asc') {
+                    return valA - valB;
+                } else {
+                    return valB - valA;
+                }
+            });
+        }
+
         // 4. 更新表格
         state.currentResults = results; // Save for modal
         renderTable(results);
+        updateSortIcons();
     }
 
 
@@ -130,14 +156,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalInterest = primary.summary.totalInterest + secondary.summary.totalInterest;
         const totalPayment = primary.summary.totalPayment + secondary.summary.totalPayment;
 
-        // 寬限期內 (假設兩者寬限期重疊，取最小或各自計算? 簡單起見各自計算首月相加)
+        // 寬限期內
         const firstMonthPayment = primary.summary.firstMonthPayment + secondary.summary.firstMonthPayment;
 
         // 寬限期後 (Post Grace)
-        // 這裡比較複雜因為寬限期可能不同。
-        // 我們定義 "寬限期後月付" 為：當兩者都進入本息攤還時的加總 (Max of grace periods? or just check a later month?)
-        // 簡單做法：取出第 (MaxGrace + 1) 個月的付款金額
-        const logicMonth = Math.max(primary.bank.gracePeriod, secondaryBank ? secondaryBank.gracePeriod : 0) * 12 + 2;
+        // Ensure we respect the global "No Grace Period" state for the logic month
+        const pGrace = state.noGracePeriod ? 0 : primary.bank.gracePeriod;
+        const sGrace = state.noGracePeriod ? 0 : (secondaryBank ? secondaryBank.gracePeriod : 0);
+
+        // Use the max grace period of the two (or 0 if disabled) to find the steady-state month
+        const logicMonth = Math.max(pGrace, sGrace) * 12 + 2;
+
         // Find payment at logicMonth for both
         const p1 = getPaymentAtMonth(primary, logicMonth);
         const p2 = getPaymentAtMonth(secondary, logicMonth);
@@ -290,6 +319,51 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderTable(results) {
         dom.tableBody.innerHTML = '';
 
+        const thGracePeriod = document.getElementById('th-grace-period');
+        const thGracePayment = document.getElementById('th-grace-payment');
+        const thPostGracePayment = document.getElementById('th-post-grace-payment');
+        const mobileSortSelect = document.getElementById('mobile-sort-select');
+
+        // Handle Column Visibility based on No Grace Period
+        if (state.noGracePeriod) {
+            // Hide Grace Period Column? Only if desired. User just said "no need to distinguish inside/outside payment".
+            // Let's keep Grace Period column to show "0 (Stopped)".
+            // HIDE Grace Payment Column
+            if (thGracePayment) thGracePayment.style.display = 'none';
+            // Rename Post Grace to just "Monthly Payment"
+            if (thPostGracePayment) {
+                thPostGracePayment.childNodes[0].nodeValue = '月付金 '; // Keep sort icon span
+            }
+            // Update mobile sort dropdown text & order
+            if (mobileSortSelect) {
+                const optGrace = mobileSortSelect.querySelector('option[value="gracePayment"]');
+                if (optGrace) optGrace.style.display = 'none';
+
+                const optPost = mobileSortSelect.querySelector('option[value="postGracePayment"]');
+                if (optPost) {
+                    optPost.textContent = '每月償還金額';
+                    // Move to top
+                    mobileSortSelect.insertBefore(optPost, mobileSortSelect.firstChild);
+                }
+            }
+        } else {
+            if (thGracePayment) thGracePayment.style.display = '';
+            if (thPostGracePayment) {
+                thPostGracePayment.childNodes[0].nodeValue = '寬限期後月付 ';
+            }
+            if (mobileSortSelect) {
+                const optGrace = mobileSortSelect.querySelector('option[value="gracePayment"]');
+                if (optGrace) optGrace.style.display = '';
+
+                const optPost = mobileSortSelect.querySelector('option[value="postGracePayment"]');
+                if (optPost) {
+                    optPost.textContent = '寬限期後月付';
+                    // Move to bottom (original position)
+                    mobileSortSelect.appendChild(optPost);
+                }
+            }
+        }
+
         // Algorithm: Find Min Values for Recommendation
         const minFirstMonth = Math.min(...results.map(r => r.summary.firstMonthPayment));
         const minPostGrace = Math.min(...results.map(r => r.summary.firstPostGracePayment)); // New Metric
@@ -301,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Badges
             let badges = '';
             // Threshold logic could be added here (e.g. within 1% of min)
-            if (res.summary.firstMonthPayment === minFirstMonth) {
+            if (res.summary.firstMonthPayment === minFirstMonth && !state.noGracePeriod) {
                 badges += `<span class="badge badge-success">最低首期</span>`;
             }
             if (res.summary.firstPostGracePayment === minPostGrace) {
@@ -325,8 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ${res.secondaryBank ? `+ ${res.secondaryBank.name.split('｜')[0]} ${(res.gapAmount / 10000).toFixed(0)}萬` : '+ 額度不足'}
                 </div>`;
             } else if (res.isCapped) {
-                // Should not happen with new logic, but safe keep
-                nameHtml += `<div style="font-size: 0.8em; color: var(--danger-color);">額度不足</div>`;
+                nameHtml += `<div style="font-size: 0.8em; color: var(--danger-color);">額度不足 (無同銀行補位方案)</div>`;
             } else {
                 nameHtml += `<div style="font-size: 0.8em; color: var(--text-secondary); margin-top: 4px;">貸 ${res.effectivePrincipal / 10000} 萬 (足額)</div>`;
             }
@@ -339,27 +412,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 rateStr = res.bank.rates.map(r => `${r.rate}% (${r.year}年)`).join('<br>');
             }
 
-            // 寬限期內月付
+            // 寬限期內月付 HTML
             let gracePaymentStr = '-';
-            // Logic: if combo, showing the combined payment
             if (res.summary.firstMonthPayment > 0) {
                 gracePaymentStr = `<span class="amount-cell clickable-number" onclick="window.showDetail(${index}, 'grace_payment')">$${res.summary.firstMonthPayment.toLocaleString()}</span>`;
             }
 
-            // 寬限期後月付 (Approx)
-            // Just use the calculated one
+            // 寬限期後月付 HTML
+            // Note: If No Grace, this is just "Payment"
+            const labelPostGrace = state.noGracePeriod ? '月付金' : '寬限期後月付';
             let postGracePaymentStr = `<span class="amount-cell clickable-number" onclick="window.showDetail(${index}, 'post_grace_payment')">$${res.summary.firstPostGracePayment.toLocaleString()}</span>`;
 
 
-            tr.innerHTML = `
+            // Build Rows dynamically
+            let html = `
                 <td data-label="銀行名稱">${nameHtml}</td>
                 <td data-label="利率結構" style="font-size: 0.9em; color: var(--text-secondary); line-height: 1.4;">${rateStr}</td>
                 <td data-label="寬限期">${state.noGracePeriod ? '0' : res.bank.gracePeriod} 年 ${state.noGracePeriod ? '<span style="font-size:0.8em;color:var(--text-secondary)">(已停用)</span>' : ''}</td>
-                <td data-label="寬限期內月付">${gracePaymentStr}</td>
-                <td data-label="寬限期後月付">${postGracePaymentStr}</td>
+            `;
+
+            // Conditionally add Grace Payment Column
+            if (!state.noGracePeriod) {
+                html += `<td data-label="寬限期內月付">${gracePaymentStr}</td>`;
+            }
+
+            html += `
+                <td data-label="${labelPostGrace}">${postGracePaymentStr}</td>
                 <td data-label="總利息支出" class="amount-cell clickable-number" onclick="window.showDetail(${index}, 'total_interest')">$${res.summary.totalInterest.toLocaleString()}</td>
                 <td data-label="總還款金額" class="amount-cell clickable-number" onclick="window.showDetail(${index}, 'total_payment')" style="font-weight:700; color: var(--accent-color)">$${res.summary.totalPayment.toLocaleString()}</td>
             `;
+
+            tr.innerHTML = html;
             dom.tableBody.appendChild(tr);
         });
     }
@@ -381,12 +464,33 @@ document.addEventListener('DOMContentLoaded', () => {
         const fmtW = n => (n / 10000).toLocaleString() + '萬';
 
         if (type === 'grace_payment') {
-            title = '寬限期內月付金計算';
+            title = state.noGracePeriod ? '首月月付金計算 (無寬限期)' : '寬限期內月付金計算';
             if (res.isCombo) {
                 const pAcc = res.bank.maxLoanAmount;
                 const pRate = res.bank.rates[0].rate;
                 const gapAcc = res.gapAmount;
                 const gapRate = res.secondaryBank.rates[0].rate;
+
+                // If No Grace, we need the actual P+I for the first month
+                let pMonth1 = Math.round(pAcc * pRate / 100 / 12);
+                let gapMonth1 = Math.round(gapAcc * gapRate / 100 / 12);
+                let formulaDesc = '利息 = 本金 × 年利率 ÷ 12';
+
+                if (state.noGracePeriod) {
+                    // Get Month 1 from monthlyData (results don't store breakdown, we need to re-calc or infer?
+                    // Actually we can re-calc roughly or we need to access the sub-results.
+                    // But combineResults consumes sub-results.
+                    // Let's just create temporary results to get exact numbers or approximate.
+                    // For display consistency, let's use the amortization formula display or just values.
+                    // Since showing PMT formula is complex, we just show "本息均攤".
+
+                    // Re-calculate simply to get the split values:
+                    const pRes = calculateBankDetails(res.bank, pAcc, true);
+                    const sRes = calculateBankDetails(res.secondaryBank, gapAcc, false);
+                    pMonth1 = pRes.monthlyData[1].payment;
+                    gapMonth1 = sRes.monthlyData[1].payment;
+                    formulaDesc = '本息平均攤還 (無寬限期)';
+                }
 
                 content = `
                     <div class="calc-row"><span class="calc-label">總貸款金額</span><span class="calc-value">${fmtW(state.loanAmount)}</span></div>
@@ -394,25 +498,44 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     <div class="calc-formula">
                         <div><strong>主約部分 (${res.bank.name.split('｜')[0]})</strong></div>
-                        ${fmt(pAcc)} × ${pRate}% ÷ 12 = ${fmt(Math.round(pAcc * pRate / 100 / 12))}
+                        <div style="font-size:0.9em;color:var(--text-secondary);">${state.noGracePeriod ? '本息攤還' : '純繳息'} (利率 ${pRate}%) : ${fmt(pMonth1)}</div>
+                        
                         <div style="margin-top:8px;"><strong>補位部分 (${res.secondaryBank.name.split('｜')[0]})</strong></div>
-                        ${fmt(gapAcc)} × ${gapRate}% ÷ 12 = ${fmt(Math.round(gapAcc * gapRate / 100 / 12))}
+                        <div style="font-size:0.9em;color:var(--text-secondary);">${state.noGracePeriod ? '本息攤還' : '純繳息'} (利率 ${gapRate}%) : ${fmt(gapMonth1)}</div>
+                        
+                        ${!state.noGracePeriod ? `
+                        <div style="margin-top:8px; font-size: 0.8em; color: gray;">
+                            驗算: ${fmt(pAcc)} × ${pRate}% ÷ 12 + ${fmt(gapAcc)} × ${gapRate}% ÷ 12
+                        </div>` : ''}
+
                         <hr style="border-top:1px dashed #475569; margin:8px 0;">
                         <div style="text-align:right; color: var(--accent-color);">合計: ${fmt(res.summary.firstMonthPayment)}</div>
                     </div>
                 `;
             } else {
                 const rate = res.bank.rates[0].rate;
-                content = `
-                    <div class="calc-row"><span class="calc-label">貸款金額</span><span class="calc-value">${fmtW(res.effectivePrincipal)}</span></div>
-                    <div class="calc-row"><span class="calc-label">首年利率</span><span class="calc-value">${rate}%</span></div>
-                    
-                    <div class="calc-formula">
-                        (貸款金額 × 年利率) ÷ 12<br>
-                        ${fmt(res.effectivePrincipal)} × ${rate}% ÷ 12<br>
-                        = <strong>${fmt(res.summary.firstMonthPayment)}</strong>
-                    </div>
-                `;
+                if (state.noGracePeriod) {
+                    content = `
+                        <div class="calc-row"><span class="calc-label">貸款金額</span><span class="calc-value">${fmtW(res.effectivePrincipal)}</span></div>
+                        <div class="calc-row"><span class="calc-label">首年利率</span><span class="calc-value">${rate}%</span></div>
+                        
+                        <div class="calc-formula">
+                            由於不使用寬限期，首月即開始本息攤還。<br>
+                            月付金: <strong>${fmt(res.summary.firstMonthPayment)}</strong>
+                        </div>
+                    `;
+                } else {
+                    content = `
+                        <div class="calc-row"><span class="calc-label">貸款金額</span><span class="calc-value">${fmtW(res.effectivePrincipal)}</span></div>
+                        <div class="calc-row"><span class="calc-label">首年利率</span><span class="calc-value">${rate}%</span></div>
+                        
+                        <div class="calc-formula">
+                            (貸款金額 × 年利率) ÷ 12<br>
+                            ${fmt(res.effectivePrincipal)} × ${rate}% ÷ 12<br>
+                            = <strong>${fmt(res.summary.firstMonthPayment)}</strong>
+                        </div>
+                    `;
+                }
             }
         }
         else if (type === 'post_grace_payment') {
@@ -629,6 +752,64 @@ document.addEventListener('DOMContentLoaded', () => {
         div.appendChild(header);
         div.appendChild(inputsDiv);
         dom.manual.bankListContainer.appendChild(div);
+    }
+
+    // Sorting Helper
+    function updateSortIcons() {
+        // Desktop Icons
+        document.querySelectorAll('th.sortable').forEach(th => {
+            const field = th.dataset.sort;
+            const icon = th.querySelector('.sort-icon');
+            if (state.sortColumn === field) {
+                icon.textContent = state.sortDirection === 'asc' ? '▲' : '▼';
+                th.style.color = 'var(--text-primary)';
+            } else {
+                icon.textContent = '⇅'; // or empty
+                th.style.color = 'var(--text-secondary)';
+            }
+        });
+
+        // Mobile Controls Sync
+        const mobileSelect = document.getElementById('mobile-sort-select');
+        const mobileDirBtn = document.getElementById('mobile-sort-dir-btn');
+        if (mobileSelect && mobileDirBtn) {
+            mobileSelect.value = state.sortColumn;
+            mobileDirBtn.querySelector('span').textContent = state.sortDirection === 'asc' ? '▲' : '▼';
+        }
+    }
+
+    // Initialize Sort Listeners (Desktop)
+    document.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+            const field = th.dataset.sort;
+            if (state.sortColumn === field) {
+                // Toggle direction
+                state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                state.sortColumn = field;
+                state.sortDirection = 'asc'; // Default new sort to asc
+            }
+            calculateLoan(); // Re-calc (includes sort and render)
+        });
+    });
+
+    // Initialize Mobile Sort Listeners
+    const mobileSelect = document.getElementById('mobile-sort-select');
+    const mobileDirBtn = document.getElementById('mobile-sort-dir-btn');
+
+    if (mobileSelect) {
+        mobileSelect.addEventListener('change', (e) => {
+            state.sortColumn = e.target.value;
+            state.sortDirection = 'asc'; // Reset to asc on change
+            calculateLoan();
+        });
+    }
+
+    if (mobileDirBtn) {
+        mobileDirBtn.addEventListener('click', () => {
+            state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+            calculateLoan();
+        });
     }
 
     function calculateManualDetails() {
